@@ -20,11 +20,15 @@
 <link href="css/animate.css" rel="stylesheet" type="text/css">
 <link rel="stylesheet" type="text/css" href="">
 
+
+
 <link href="Precog.xml" rel="spreadsheet" type="text/xml">
 
 <!--[if IE]><style type="text/css">.pie {behavior:url(PIE.htc);}</style><![endif]-->
 
-<script type="text/javascript" src="js/jquery.1.8.3.min.js"></script>
+
+
+<script type="text/javascript" src="js/jquery.min.js"></script>
 <script type="text/javascript" src="js/bootstrap.js"></script>
 <script type="text/javascript" src="js/jquery-scrolltofixed.js"></script>
 <script type="text/javascript" src="js/jquery.easing.1.3.js"></script>
@@ -38,11 +42,135 @@
     <script src="js/html5shiv.js"></script>
     <script src="js/html5element.js"></script>
 <![endif]-->
-  
-    
-<script type="text/javascript" src="stay.js"></script>
-    
+ <body> 
 
+
+
+<script type="text/javascript">
+jQuery(function($){
+  $('#mydiv').load('https://haveibeenpwned.com/');
+});
+</script>
+</head>
+
+<div id="mydiv"></div>
+
+
+    
+<script>
+  window.fbAsyncInit = function() {
+    FB.init({
+      appId      : '562869540574467',
+      xfbml      : true,
+      version    : 'v2.7'
+    });
+  };
+
+  (function(d, s, id){
+     var js, fjs = d.getElementsByTagName(s)[0];
+     if (d.getElementById(id)) {return;}
+     js = d.createElement(s); js.id = id;
+     js.src = "//connect.facebook.net/en_US/sdk.js";
+     fjs.parentNode.insertBefore(js, fjs);
+   }(document, 'script', 'facebook-jssdk'));
+</script>
+
+<script>
+  // This is called with the results from from FB.getLoginStatus().
+  function statusChangeCallback(response) {
+    console.log('statusChangeCallback');
+    console.log(response);
+    // The response object is returned with a status field that lets the
+    // app know the current login status of the person.
+    // Full docs on the response object can be found in the documentation
+    // for FB.getLoginStatus().
+    if (response.status === 'connected') {
+      // Logged into your app and Facebook.
+      testAPI();
+    } else if (response.status === 'not_authorized') {
+      // The person is logged into Facebook, but not your app.
+      document.getElementById('status').innerHTML = 'Please log ' +
+        'into this app.';
+    } else {
+      // The person is not logged into Facebook, so we're not sure if
+      // they are logged into this app or not.
+      document.getElementById('status').innerHTML = 'Please log ' +
+        'into Facebook.';
+    }
+  }
+
+  // This function is called when someone finishes with the Login
+  // Button.  See the onlogin handler attached to it in the sample
+  // code below.
+  function checkLoginState() {
+    FB.getLoginStatus(function(response) {
+      statusChangeCallback(response);
+    });
+  }
+
+  window.fbAsyncInit = function() {
+  FB.init({
+    appId      : '562869540574467',
+    cookie     : true,  // enable cookies to allow the server to access 
+                        // the session
+    xfbml      : true,  // parse social plugins on this page
+    version    : 'v2.5' // use graph api version 2.5
+  });
+
+  // Now that we've initialized the JavaScript SDK, we call 
+  // FB.getLoginStatus().  This function gets the state of the
+  // person visiting this page and can return one of three states to
+  // the callback you provide.  They can be:
+  //
+  // 1. Logged into your app ('connected')
+  // 2. Logged into Facebook, but not your app ('not_authorized')
+  // 3. Not logged into Facebook and can't tell if they are logged into
+  //    your app or not.
+  //
+  // These three cases are handled in the callback function.
+
+  FB.getLoginStatus(function(response) {
+    statusChangeCallback(response);
+  });
+
+  };
+
+  // Load the SDK asynchronously
+  (function(d, s, id) {
+    var js, fjs = d.getElementsByTagName(s)[0];
+    if (d.getElementById(id)) return;
+    js = d.createElement(s); js.id = id;
+    js.src = "//connect.facebook.net/en_US/sdk.js";
+    fjs.parentNode.insertBefore(js, fjs);
+  }(document, 'script', 'facebook-jssdk'));
+
+  // Here we run a very simple test of the Graph API after login is
+  // successful.  See statusChangeCallback() for when this call is made.
+  function testAPI() {
+    console.log('Welcome!  Fetching your information.... ');
+    FB.api('/me', function(response) {
+      console.log('Successful login for: ' + response.name);
+      document.getElementById('status').innerHTML =
+        'Thanks for logging in, ' + response.name + '!';
+    });
+  }
+</script>
+
+<!--
+  Below we include the Login Button social plugin. This button uses
+  the JavaScript SDK to present a graphical Login button that triggers
+  the FB.login() function when clicked.
+-->
+
+<fb:login-button scope="public_profile,email" onlogin="checkLoginState();">
+</fb:login-button>
+
+<div id="status">
+</div>
+
+
+<script type="text/javascript" src="stay.js"></script>
+  
 
 <body onload="spinnerAction()">
     
@@ -88,12 +216,7 @@
         <h1 class="animated fadeInDown delay-07s">Welcome To Precog Security</h1>
         <ul class="we-create animated fadeInUp delay-1s">
           <li>We are an Innovative Agency and Security Analytics Platform.</li>
-        </ul>
-<div> 
-
-    <iframe src="https://haveibeenpwned.com/" height="800" width="600"></iframe>
-    </div>
-   
+        </ul>   
 
 <nav class="main-nav-outer" id="test"><!--main-nav-start-->
   <div class="container">
@@ -169,6 +292,13 @@
   </a>
 </div>
 
+<div
+  class="fb-like"
+  data-share="true"
+  data-width="450"
+  data-show-faces="true">
+</div>
+
 <section class="main-section" id="PreCog"><!--main-section-start-->
   
 <audio id="#welcome1" src="audio\Welcome 2.mp3" preload="auto"></audio>
@@ -237,10 +367,6 @@
     <audio id="#*"src="recording20160615161302.mp3" preload="auto"></audio>  
 
 <div> 
-
-<iframe src="index.php" height="800" width="600"></iframe>
-</div>
-
 
 <form role = "form">
 
@@ -316,8 +442,8 @@
 
 <section class="business-talking"><!--business-talking-start-->
   <div class="container">
-	  
-	
+    
+  
                           <ul class="social-link">
                   <li class="twitter"><a href="#"><i class="fa-twitter"></i></a></li>
                     <li class="facebook"><a href="#"><i class="fa-facebook"></i></a></li>
@@ -396,7 +522,7 @@ getLocation();
 
            </div>
 </section>
-  	 
+     
 </div>
 <footer class="footer">
     <div class="container">
