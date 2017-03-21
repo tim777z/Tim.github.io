@@ -222,7 +222,7 @@
   <div class="container">
         <ul class="main-nav">
           <li><a href="#header"onclick="document.getElementById('#').play();">Profile</a></li>
-           
+
         </ul>
         <a class="res-nav_click" href="#"><i class="fa-bars"></i></a>
     </div>
@@ -471,11 +471,70 @@
           <li><a href="#">
               <img src="img/burgos3.jpg" alt="">
             </a>
-   
+             <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        width: 500px;
+        height: 500px;
+      }
+    </style>
+    <div id="map"></div>
+<li><a href="#map"></a></li>
+  <p id="demo"></p>
+  
+    <script>
+     
+
+var loc = document.getElementById("demo");
+
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(showPosition);
+    } else { 
+        loc.innerHTML = "Geolocation is not supported by this browser.";
+    }
+}
+
+function showPosition(position) {
+    loc.innerHTML = "Latitude: " + position.coords.latitude + 
+    "<br>Longitude: " + position.coords.longitude;
+      var myLatlng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+      var mapOptions = {
+      zoom: 3,
+      center: myLatlng,
+      mapTypeId: google.maps.MapTypeId.SATELLITE
+};
+var map = new google.maps.Map(document.getElementById("map"),
+    mapOptions);
+
+}
+getLocation();
+      
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC4O0Iet5tltzWO8zjwKmOgo1pgvRKMmKM&signed_in=true&callback=initMap"
+    async defer></script>
+
+            
+            </li>
+        </ul>
+    </div>
+<section class="main-section contact" id="contact">
+
+           </div>
+</section>
+     
+</div>
 <footer class="footer">
     <div class="container">
         <div class="footer-logo"><a href="#"><img src="img\blue-butterfly.jpg" alt=""></a></div>
-        <span class="copyright">Copyright © 1993 | <a href="http://github.com/precog.io/">Timlangevldt</a> by Timlangeveldt</span>
+        <span class="copyright">Copyright © 1993 | <a href="http://github.com/precog.io/">Bootstrap Themes</a> by BootstrapTaste</span>
     </div>
     <!-- 
         All links in the footer should remain intact. 
