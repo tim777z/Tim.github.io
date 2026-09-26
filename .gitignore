@@ -1,3 +1,28 @@
+# Dependencies
 node_modules/
+
+# Secrets and local configuration. This is a static site, so nothing under
+# `.env` should ever be committed - see SECURITY.md.
 .env
+.env.*
+!.env.example
+
+# Logs and test output
 *.log
+coverage/
+.nyc_output/
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
+
+# Build output (none today, declared so it can never be committed by accident)
+dist/
+_site/
+.jekyll-cache/
+.jekyll-metadata

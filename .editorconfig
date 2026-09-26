@@ -1,0 +1,23 @@
+# EditorConfig - keeps formatting consistent across contributors and editors.
+# See https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# First-party browser scripts historically used tabs; the hardened files in
+# js/ and the root now use 2 spaces, so keep the new house style consistent.
+[*.{js,mjs,html,css,json,yml,yaml,md}]
+indent_style = space
+indent_size = 2
+
+# Vendored third-party code is not ours to reformat.
+[vendor/**]
+indent_style = tab
+trim_trailing_whitespace = false
+insert_final_newline = false

@@ -1,0 +1,43 @@
+{
+  "name": "tim-precog-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static portfolio site for Tim Langeveldt / Precog Security, with a dependency-free quality gate.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "serve": "node scripts/serve.mjs",
+    "test": "node --test",
+    "lint": "node scripts/lint.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "verify:vendor": "node scripts/verify-vendor.mjs",
+    "vendor:sync": "node scripts/vendor-sync.mjs",
+    "verify": "npm run lint && npm run check:secrets && npm run verify:vendor && npm test",
+    "ci": "npm run verify"
+  },
+  "keywords": [
+    "static-site",
+    "portfolio"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tim777z/Tim.github.io.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tim777z/Tim.github.io/issues"
+  },
+  "homepage": "https://tim777z.github.io/",
+  "dependencies": {},
+  "devDependencies": {
+    "jquery": "3.7.1"
+  },
+  "browserslist": [
+    "> 0.5%",
+    "last 2 versions",
+    "not dead"
+  ]
+}

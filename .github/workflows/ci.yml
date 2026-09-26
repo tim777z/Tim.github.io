@@ -1,16 +1,61 @@
 name: CI
+
+# The site is static, so "build" means: the quality gate passes, the vendored
+# dependencies are exactly what we pinned, and nothing in the repository is a
+# credential. Every step below gates a pull request.
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+
+# Least privilege: this workflow only ever needs to read the repository.
+permissions:
+  contents: read
+
+# A newer push to the same branch makes the in-flight run pointless.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  verify:
+    name: Lint, integrity, secrets, tests
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out
+        uses: actions/checkout@v4
         with:
-          cache: 'npm'
-      - run: npm ci
-      - run: npm test
+          # Do not leave the job's token in .git/config for later steps.
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Single source of truth for the Node version, shared with .npmrc's
+          # engine-strict so a local run and a CI run agree.
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install (reproducible, from the lockfile)
+        run: npm ci
+
+      - name: Lint first-party JavaScript and HTML
+        run: npm run lint
+
+      - name: Scan for committed credentials
+        run: npm run check:secrets
+
+      - name: Verify vendored dependency integrity
+        run: npm run verify:vendor
+
+      # Includes: unit tests for the countdown, the chat bot and the tracking
+      # link builder; HTML asset integrity; the vendor manifest; and a live
+      # request against the development server, including traversal attempts.
+      - name: Run the test suite
+        run: npm test
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
