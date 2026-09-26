@@ -1,0 +1,87 @@
+{
+  "$comment": "Integrity manifest for third-party code in vendor/. Enforced by `npm run verify:vendor` (scripts/verify-vendor.mjs) on every CI run. Never edit an existing sha256 by hand - re-pin with `npm run verify:vendor -- --update` and review the diff.",
+  "schemaVersion": 1,
+  "libraries": [
+    {
+      "file": "jquery-3.7.1/jquery.min.js",
+      "package": "jquery",
+      "version": "3.7.1",
+      "license": "MIT",
+      "source": "https://registry.npmjs.org/jquery/-/jquery-3.7.1.tgz",
+      "provenance": "Copied verbatim from the npm tarball (sha512-m4avr8yL8kmFN8psrbFFFmB/If14iN5o9nw/NgnnM+kybDJpRsAynV2BsfpTYrTRysYUdADVD7CkUUizgkpLfg==). Replaces the end-of-life jQuery 1.7.2 (2011) and 1.8.3 copies that this site used to ship.",
+      "sha256": "sha256-fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a"
+    },
+    {
+      "file": "bootstrap.js",
+      "package": "bootstrap",
+      "version": "3.0.3",
+      "license": "MIT",
+      "source": "https://getbootstrap.com/docs/3.0.3/javascript/",
+      "sha256": "sha256-4a66751ea139e67f7f2d431b9105ad11adebaf1db2ca3d0896fb7803e64dcf59"
+    },
+    {
+      "file": "classie.js",
+      "package": "classie",
+      "version": null,
+      "license": "MIT",
+      "source": "https://github.com/desandro/classie",
+      "sha256": "sha256-c4ea9310d72e37fe799d48ae3fc43dcb53e3db7c4ae13763d4c5b893f6ceb64b"
+    },
+    {
+      "file": "html5element.js",
+      "package": "html5shiv",
+      "version": "3.7.0",
+      "license": "MIT/GPL-2.0",
+      "source": "https://github.com/jdalton/html5shiv",
+      "sha256": "sha256-5d7921473f3ceb046a5742dd5517e067d076ac8ed0161df55e24aa6882a10258"
+    },
+    {
+      "file": "html5shiv.js",
+      "package": "html5shiv",
+      "version": "3.7.0",
+      "license": "MIT/GPL-2.0",
+      "source": "https://github.com/jdalton/html5shiv",
+      "sha256": "sha256-3217cc8b501b86b92da66d9e9d2b3f598adbf7c3e16087c0c69e2102a82ae8fe"
+    },
+    {
+      "file": "jquery.easing-1.3.js",
+      "package": "jquery-easing",
+      "version": "1.3",
+      "license": "MIT",
+      "source": "https://gsgd.co.uk/sandbox/jquery/easing/",
+      "sha256": "sha256-e4273399cc0bc22e58b35f9f79fdf2705a39ddf4ad918ce852f2624e271d8248"
+    },
+    {
+      "file": "jquery.isotope.js",
+      "package": "isotope",
+      "version": null,
+      "license": "MIT",
+      "source": "https://github.com/isotopejs/isotope",
+      "sha256": "sha256-c2eec40c0665f787e301029b16aeaa7d7f4b48da495157ab2c806fac7f264c11"
+    },
+    {
+      "file": "jquery.scrolltofixed.js",
+      "package": "jquery.scrolltofixed",
+      "version": null,
+      "license": "MIT",
+      "source": "https://github.com/bigspotteddog/ScrollToFixed",
+      "sha256": "sha256-fde04a0c95d79fb428d75f7e94620d4d0ab6aa5e50eefdbcf585ea663af2ee4f"
+    },
+    {
+      "file": "respond-1.1.0.min.js",
+      "package": "respond.js",
+      "version": "1.1.0",
+      "license": "MIT",
+      "source": "https://github.com/scottjehl/respond.js",
+      "sha256": "sha256-70129457d61b47de4fa280db3e59d5e673bf07681e61471f45a59e2f1d0ae343"
+    },
+    {
+      "file": "wow.js",
+      "package": "wow.js",
+      "version": null,
+      "license": "MIT",
+      "source": "https://github.com/matthieugutesse/matthieugutesse.github.io/tree/master/wow.js",
+      "sha256": "sha256-5783e0b5042da69603fe605d720de8a86c7f220de94ea60357a2fdbbe0177b77"
+    }
+  ]
+}
