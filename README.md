@@ -17,14 +17,18 @@ isolated under [`vendor/`](vendor/manifest.json).
 git clone https://github.com/tim777z/Tim.github.io.git
 cd Tim.github.io
 nvm use                 # optional; honours .nvmrc
-npm ci                  # installs nothing: the site has zero runtime dependencies
-npm run verify          # lint + secret scan + vendor integrity + tests
+npm ci                  # installs the one dev dependency (jQuery, pinned); the
+                        # site itself has zero runtime dependencies
+npm run verify          # lint + secret scan + vendor integrity + tests + coverage
 npm start               # http://127.0.0.1:8080/
 ```
 
 `npm start` runs [`scripts/serve.mjs`](scripts/serve.mjs), a small static file
-server written against the Node.js standard library. You can also just open
-`index.html` in a browser; the site has no build output to generate.
+server written against the Node.js standard library. It logs one JSON line per
+request and per failure, so a blank page and a refused request are never the
+same mystery (see [Observability](#observability-when-you-run-the-server)). You
+can also just open `index.html` in a browser; the site has no build output to
+generate.
 
 **Requirements:** Node.js >= 20 (see `.nvmrc`). Nothing else.
 
@@ -36,6 +40,7 @@ server written against the Node.js standard library. You can also just open
 | --- | --- |
 | `npm start` | Serve the site on `http://127.0.0.1:8080/` (`-- --port 8081` to change) |
 | `npm test` | Run the test suite (`node --test`, no test framework to install) |
+| `npm run test:coverage` | The same suite, plus a line-coverage floor that fails the build |
 | `npm run lint` | Syntax check plus the security and hygiene rules for first-party code |
 | `npm run check:secrets` | Fail if a credential is committed |
 | `npm run verify:vendor` | Fail if a vendored file does not match its SHA-256 pin |
@@ -60,7 +65,7 @@ script.js               offer page handlers (countdown + wheel spin)
 gotourl.js              campaign tracking link builder
 
 vendor/                 third-party code, checksummed in vendor/manifest.json
-scripts/                the quality gate: lint, secret scan, integrity, server
+scripts/                the quality gate: lint, secret scan, integrity, coverage, server
 test/                   the test suite
 ```
 
@@ -95,22 +100,47 @@ is only requested after the visitor clicks the map button.
 
 ## How this is verified
 
-`npm run verify` runs four gates, all of which CI runs on every push and pull
+`npm run verify` runs five gates, all of which CI runs on every push and pull
 request:
 
 1. **`npm run lint`** — `node --check` on every first-party script, plus rules for
    the things that actually matter in a browser: no plaintext `http://`
-   subresource or redirect, no `innerHTML` sink, no `eval`/`new Function`/
-   `document.write`, no duplicate element `id`. Rules are in
-   [`scripts/lint.mjs`](scripts/lint.mjs) and are written against the standard
-   library, so the gate works on a machine that has never seen this repository.
+   subresource or redirect, no plaintext `url()`/`@import` in a stylesheet, no
+   `innerHTML` sink, no `eval`/`new Function`/`document.write`, no duplicate
+   element `id`. Rules are in [`scripts/lint.mjs`](scripts/lint.mjs) and are
+   written against the standard library, so the gate works on a machine that has
+   never seen this repository.
 2. **`npm run check:secrets`** — scans first-party files for credentials
    (private keys, cloud and payment tokens, JWTs, `password = "..."` assignments).
    Anything genuinely public is declared, with a reason, in
    [`scripts/secret-scan-allowlist.json`](scripts/secret-scan-allowlist.json) and
    still reported as a warning so it never goes quiet.
 3. **`npm run verify:vendor`** — the integrity check described above.
-4. **`npm test`** — 60+ tests, see below.
+4. **`npm run test:coverage`** — the test suite, plus a coverage floor, see below.
+5. **`npm audit --audit-level=high`** — a dependency advisory at high or critical
+   fails the build.
+
+Beyond the gate, CI runs [CodeQL](https://codeql.github.com/) over the first-party
+JavaScript on every push and pull request, plus weekly. The linter is a list of
+patterns we chose; CodeQL is data-flow analysis over the whole shipped code, which
+is how a value that actually reaches a sink gets caught even if nobody wrote a
+rule for it. Both actions are pinned to commit SHAs, and
+[`.github/dependabot.yml`](.github/dependabot.yml) opens upgrade pull requests
+weekly for npm and for the workflows themselves.
+
+### Coverage floor
+
+`npm run test:coverage` runs the same suite with V8 coverage and fails below
+**90% line coverage** ([`scripts/coverage-gate.mjs`](scripts/coverage-gate.mjs)).
+A coverage number that nobody acts on is decoration; this one is in `npm run
+verify`, so a regression fails a pull request.
+
+The number covers the shipped browser code, not just the Node modules:
+`test/harness.mjs` executes `timer.js`, `js/chat-bot.js` and `js/index.js` in a
+`node:vm` context by absolute path, which is what the coverage runner records.
+Lower the floor with `--min-lines=NN` (or `COVERAGE_MIN_LINES`) when you
+deliberately trade coverage away, and say why in the commit. A coverage report
+that cannot be parsed is a **failure**, never a pass.
 
 ### What the tests cover
 
@@ -124,6 +154,10 @@ used to be broken:
   with no layout.
 - `test/chat-bot.test.js` — every rule and reply, plus the `TypeError` on nullish
   input and the upper-case keywords that could never match.
+- `test/chat-widget.test.js` — `js/index.js`, the widget that turns visitor input
+  into DOM: submit on Enter, cleared input, delayed reply, quiet degradation when
+  the chat markup is absent, and that a payload is rendered as text and never
+  through `.html()`.
 - `test/tracking.test.js` — the tracking link builder: https only, parameter
   allowlist, encoding, and the injection attempts that the old string
   concatenation allowed.
@@ -132,17 +166,45 @@ used to be broken:
   duplicate ids.
 - `test/vendor-manifest.test.js` — the manifest matches the files on disk, and
   the removed end-of-life blobs have not come back.
-- `test/serve.test.js` — the development server, including raw-socket path
-  traversal attempts (a `fetch()` client normalises `..` away before it sends).
+- `test/serve.test.js` — the development server: raw-socket path traversal
+  attempts (a `fetch()` client normalises `..` away before it sends), the
+  structured log for every outcome, and an injected read failure.
+- `test/log.test.js` — the logger itself, because an error logger that throws
+  while reporting a failure is worse than no logger.
+- `test/harness.test.js` — the doubles, which are load-bearing for all of the
+  above.
+
+### Observability when you run the server
+
+```bash
+npm start
+{"ts":"...","level":"info","event":"server_start","url":"http://127.0.0.1:8080/","documentRoot":"..."}
+{"ts":"...","level":"info","event":"request","method":"GET","target":"/index.html","status":200,"bytes":17762,"durationMs":2}
+{"ts":"...","level":"warn","event":"request_refused","reason":"path_outside_document_root","status":403,"method":"GET","target":"/../../etc/passwd"}
+{"ts":"...","level":"error","event":"stream_error","path":"img/Tim.png","method":"GET","code":"EACCES","message":"permission denied"}
+```
+
+Ctrl-C writes a `server_stop` record carrying the run's counters. `LOG_LEVEL=debug`
+adds per-request detail. One JSON object per line is greppable by a human and
+parseable by `jq`; the format lives in [`scripts/log.mjs`](scripts/log.mjs).
 
 ### Why there is no ESLint, Prettier or Jest
 
 Every gate here is implemented with the Node.js standard library, so
 `npm ci && npm run verify` works on a machine that has never seen this
 repository, with no downloads, no install scripts and no third-party code
-executing in CI. Adding a linter or a test framework would add a supply-chain
-surface to a project whose whole point is that it has none. If the site grows
-real application logic, revisit that trade-off deliberately and record it here.
+executing in CI (`.npmrc` sets `ignore-scripts=true` so that stays true even by
+accident). Adding a linter or a test framework would add a supply-chain
+surface to a project whose whole point is that it has none.
+
+**Type checking was considered and declined, deliberately.** `tsc` with
+`checkJs` would catch real defects, and it is the obvious next step if the site
+grows real application logic. It was not adopted here because it would put a
+~20 MB compiler, updated weekly by Dependabot, in front of a security pipeline
+whose main asset is that there is nothing in it to compromise — and because the
+first-party browser code is ES5 written for a page that still ships IE shims,
+where a strict checker produces more noise than signal. If that changes, adopt it
+in its own pull request, with the size and the update cost stated here.
 
 ---
 

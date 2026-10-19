@@ -29,8 +29,29 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
  * @returns {Object} the sandbox, after the script has run
  */
 export function loadScript(relativePath, globals = {}) {
-  const filename = join(REPO_ROOT, ...relativePath.split('/'));
-  const code = readFileSync(filename, 'utf8');
+  const sandbox = createSandbox(globals);
+  runInSandbox(sandbox, relativePath);
+  return sandbox;
+}
+
+/**
+ * Execute several shipped files in one sandbox, in order.
+ *
+ * Needed whenever one file depends on a global another file declares - the
+ * chat widget calls the chat bot, and testing that wiring is the point.
+ *
+ * @param {string[]} relativePaths
+ * @param {Object} [globals]
+ * @returns {Object} the sandbox, after every script has run
+ */
+export function loadScripts(relativePaths, globals = {}) {
+  const sandbox = createSandbox(globals);
+  for (const path of relativePaths) runInSandbox(sandbox, path);
+  return sandbox;
+}
+
+/** @returns {Object} a fresh sandbox; `runInSandbox` fills it with code. */
+export function createSandbox(globals = {}) {
   const sandbox = {
     console: { log() {}, warn() {}, error() {} },
     setTimeout,
@@ -41,16 +62,28 @@ export function loadScript(relativePath, globals = {}) {
     ...globals,
   };
   vm.createContext(sandbox);
-  vm.runInContext(code, sandbox, { filename: relativePath });
+  return sandbox;
+}
+
+/** Run one repository file inside an existing sandbox. */
+export function runInSandbox(sandbox, relativePath) {
+  const filename = join(REPO_ROOT, ...relativePath.split('/'));
+  const code = readFileSync(filename, 'utf8');
+  // The absolute path (not the repo-relative one) is what the coverage runner
+  // keys off, so passing it here is what lets `npm run test:coverage` account
+  // for the shipped browser code instead of only the Node modules.
+  vm.runInContext(code, sandbox, { filename });
   return sandbox;
 }
 
 /**
- * Controllable setInterval/clearInterval pair: no test ever waits on a real
- * clock, and the tests can assert that a timer was actually stopped.
+ * Controllable setInterval/clearInterval and setTimeout/clearTimeout pairs: no
+ * test ever waits on a real clock, and the tests can assert that a timer was
+ * actually stopped.
  */
 export function createFakeClock() {
   const timers = new Map();
+  const timeouts = new Map();
   let nextId = 1;
 
   return {
@@ -62,6 +95,14 @@ export function createFakeClock() {
     clearInterval(id) {
       timers.delete(id);
     },
+    setTimeout(fn, ms) {
+      const id = nextId++;
+      timeouts.set(id, { id, fn, ms });
+      return id;
+    },
+    clearTimeout(id) {
+      timeouts.delete(id);
+    },
     /** How many intervals are still running. */
     get activeCount() {
       return timers.size;
@@ -72,6 +113,26 @@ export function createFakeClock() {
         for (const timer of [...timers.values()]) timer.fn();
       }
     },
+    /**
+     * Run everything currently queued on the timeout queue, including work
+     * those callbacks queue themselves. Bounded, so a runaway retry loop fails
+     * the test instead of hanging it.
+     */
+    flush(maxRounds = 50) {
+      let fired = 0;
+      while (timeouts.size > 0 && fired < maxRounds) {
+        for (const [id, timeout] of [...timeouts.entries()]) {
+          timeouts.delete(id);
+          timeout.fn();
+          fired += 1;
+        }
+      }
+      return fired;
+    },
+    /** How many timeouts are still queued. */
+    get pendingTimeouts() {
+      return timeouts.size;
+    },
   };
 }
 
@@ -80,12 +141,26 @@ export function createElement(name, options = {}) {
   return {
     name,
     htmlValue: '',
+    textValue: '',
     cssValue: {},
     /** false models an element that has left the document. */
     inDocument: options.inDocument ?? true,
     /** null models a parent with no layout, i.e. jQuery's offset() -> null. */
     parentOffset: options.parentOffset === undefined ? 0 : options.parentOffset,
     scrollTop: options.scrollTop ?? 0,
+    scrollHeight: options.scrollHeight ?? 0,
+    /** Value of the wrapped <input>, for .val(). */
+    value: options.value ?? '',
+    /** Classes added with .addClass(). */
+    classes: [],
+    /** Children looked up with .find(), keyed by selector without the dot. */
+    children: {},
+    /** Everything passed to .append(). */
+    appended: [],
+    /** Handlers registered with .on(), keyed by event name. */
+    handlers: {},
+    /** Animation property maps passed to .animate(). */
+    animations: [],
   };
 }
 
@@ -112,8 +187,76 @@ export function createFakeJQuery() {
     return this;
   };
 
-  Wrapper.prototype.css = function css(value) {
-    this.nodes.forEach((node) => Object.assign(node.cssValue, value));
+  Wrapper.prototype.text = function text(value) {
+    if (value === undefined) return this.nodes[0]?.textValue;
+    this.nodes.forEach((node) => {
+      node.textValue = String(value);
+    });
+    return this;
+  };
+
+  Wrapper.prototype.val = function val(value) {
+    if (value === undefined) return this.nodes[0]?.value;
+    this.nodes.forEach((node) => {
+      node.value = String(value);
+    });
+    return this;
+  };
+
+  Wrapper.prototype.prop = function prop(name, value) {
+    if (value === undefined) return this.nodes[0]?.[name];
+    this.nodes.forEach((node) => {
+      node[name] = value;
+    });
+    return this;
+  };
+
+  /** css({color: 'red'}) and css('display', 'block') are both used. */
+  Wrapper.prototype.css = function css(name, value) {
+    if (typeof name === 'object') {
+      this.nodes.forEach((node) => Object.assign(node.cssValue, name));
+      return this;
+    }
+    this.nodes.forEach((node) => {
+      node.cssValue[name] = value;
+    });
+    return this;
+  };
+
+  Wrapper.prototype.addClass = function addClass(name) {
+    this.nodes.forEach((node) => node.classes.push(name));
+    return this;
+  };
+
+  /** Lazily creates the child a selector names, so find('.text') works. */
+  Wrapper.prototype.find = function find(selector) {
+    const parent = this.nodes[0];
+    if (!parent) return new Wrapper([]);
+    parent.children = parent.children ?? {};
+    const key = selector.replace(/^[.#]/, '');
+    parent.children[key] = parent.children[key] ?? createElement(key);
+    return new Wrapper([parent.children[key]]);
+  };
+
+  Wrapper.prototype.append = function append(child) {
+    const nodes = child instanceof Wrapper ? child.nodes : [child];
+    this.nodes.forEach((node) => node.appended.push(...nodes));
+    return this;
+  };
+
+  Wrapper.prototype.on = function on(event, handler) {
+    this.nodes.forEach((node) => {
+      node.handlers[event] = handler;
+    });
+    return this;
+  };
+
+  Wrapper.prototype.stop = function stop() {
+    return this;
+  };
+
+  Wrapper.prototype.animate = function animate(properties) {
+    this.nodes.forEach((node) => node.animations.push(properties));
     return this;
   };
 
@@ -152,6 +295,12 @@ export function createFakeJQuery() {
       return new Wrapper([]);
     }
     if (typeof target === 'string') {
+      // A leading '<' is an HTML literal, the way the chat widget builds a
+      // transcript line; anything else is a selector lookup.
+      if (target.trim().startsWith('<')) {
+        const tag = target.trim().slice(1).split(/[\s>/]/)[0] || 'div';
+        return new Wrapper([createElement(tag)]);
+      }
       const elements = jQuery.registry.get(target);
       return new Wrapper(elements ? [...elements] : []);
     }

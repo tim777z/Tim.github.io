@@ -1,0 +1,64 @@
+name: CodeQL
+
+# Static analysis of the first-party JavaScript, on every push and pull request,
+# plus weekly so that new advisories in the query suite are picked up without
+# waiting for a commit.
+#
+# Why this exists alongside `npm run lint`: the linter is a list of patterns we
+# chose. CodeQL is a data-flow analysis over the whole shipped code, which is
+# how a real finding - a value that reaches innerHTML, a path built from
+# unvalidated input - gets caught even if nobody wrote a rule for it.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "17 5 * * 1" # Mondays, off the hour so this job is not competing
+                         # with every other repository's scheduled run.
+  workflow_dispatch:
+
+# Least privilege: this workflow analyses code and writes security events. It
+# needs no write access to the repository itself.
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze JavaScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript]
+
+    steps:
+      # Pinned to a SHA: see .github/workflows/ci.yml for why.
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # No build step: the site's JavaScript is shipped as-is, so CodeQL
+      # analyses the same bytes the browser downloads.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-and-quality
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
+        with:
+          category: "/language:${{ matrix.language }}"
+          # Raise this to "high" when the alert backlog is empty; until then,
+          # paging on every low-severity pattern is how a gate gets ignored.
+          security-severity: medium

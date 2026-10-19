@@ -12,13 +12,19 @@
  *
  * What it checks:
  *   error  E101 syntax error (node --check)                     .js / .mjs
- *   error  E102 plaintext http:// subresource or redirect      .js / .html
+ *   error  E102 plaintext http:// subresource or redirect      .js / .html / .css
  *   error  E103 innerHTML assignment (DOM XSS sink)             .js / .html
  *   error  E104 eval() / new Function() / document.write()      .js / .html
  *   error  E105 duplicate element id                            .html
  *   warn   W101 protocol-relative subresource                   .html
  *   warn   W102 console.log in shipped browser code             .js
  *   warn   W103 removed jQuery API (.bind/.load/.size)          .js
+ *
+ * Stylesheets are scanned because they load subresources too. `url(http://...)`
+ * in a CSS file is exactly the same mixed-content and third-party-execution
+ * problem as a plaintext <script src>, and for years it was the one place the
+ * gate could not see: the site carried a dead plaintext image reference in
+ * style2.css because only HTML attributes were checked.
  *
  * Per-file opt-out for the pattern rules: add `lint:ignore-file` plus a reason
  * on its own line (JS: `// lint:ignore-file - reason`,
@@ -36,7 +42,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'vendor', 'coverage', '.jekyll-cache', '_site', 'res', 'img', 'smilies']);
-const LINTABLE = new Set(['.js', '.mjs', '.html', '.htm']);
+const LINTABLE = new Set(['.js', '.mjs', '.html', '.htm', '.css']);
 
 /** @returns {{file: string, abs: string, text: string}[]} */
 function collect(dir) {
@@ -54,6 +60,7 @@ function collect(dir) {
 }
 
 const isHtml = (file) => extname(file).toLowerCase() === '.html' || extname(file).toLowerCase() === '.htm';
+const isCss = (file) => extname(file).toLowerCase() === '.css';
 
 /** Rules that are one regex + one message, applied per line. */
 const LINE_RULES = [
@@ -77,6 +84,23 @@ const LINE_RULES = [
     re: /(?:window\.)?location(?:\.href)?\s*=\s*["']\s*http:\/\/[^"']+/g,
     only: 'js',
     message: (m) => `redirect to plaintext http:// (open redirect over cleartext): ${m[0].slice(0, 90)}`,
+  },
+  {
+    // A stylesheet loads code, images and fonts. Plaintext there is the same
+    // defect as a plaintext <script src>, and it is invisible to an HTML-only
+    // rule set - which is how one survived here.
+    id: 'E102',
+    severity: 'error',
+    re: /url\(\s*['"]?\s*http:\/\/[^)'"]+/gi,
+    only: 'css',
+    message: (m) => `plaintext http:// url() in a stylesheet (mixed content / third-party fetch): ${m[0].slice(0, 90)}`,
+  },
+  {
+    id: 'E102',
+    severity: 'error',
+    re: /@import\s+(?:url\()?\s*['"]?\s*http:\/\/[^)'"\s;]+/gi,
+    only: 'css',
+    message: (m) => `@import over plaintext http:// (mixed content): ${m[0].slice(0, 90)}`,
   },
   {
     id: 'E103',
@@ -133,6 +157,7 @@ let checked = 0;
 
 for (const { file, abs, text } of files) {
   const html = isHtml(file);
+  const css = isCss(file);
 
   // An opt-out marker must be a whole comment line, so this file's own
   // documentation of the marker does not silence it.
@@ -142,7 +167,8 @@ for (const { file, abs, text } of files) {
   checked += 1;
 
   // E101: authoritative syntax check via the very runtime that CI uses.
-  if (!html) {
+  // Stylesheets are not JavaScript, so node --check does not apply to them.
+  if (!html && !css) {
     const result = spawnSync(process.execPath, ['--check', abs], { encoding: 'utf8' });
     if (result.status !== 0) {
       const detail = (result.stderr || '').split(/\r?\n/).find((l) => l.trim()) ?? 'syntax error';
@@ -156,8 +182,12 @@ for (const { file, abs, text } of files) {
   lines.forEach((lineText, index) => {
     const lineNo = index + 1;
     for (const rule of LINE_RULES) {
+      // `only` names the file kinds a rule applies to; 'both' means HTML and
+      // JavaScript, i.e. everything that is not a stylesheet.
       if (rule.only === 'html' && !html) continue;
-      if (rule.only === 'js' && html) continue;
+      if (rule.only === 'js' && (html || css)) continue;
+      if (rule.only === 'css' && !css) continue;
+      if (rule.only === 'both' && css) continue;
       if (rule.notUnder?.some((prefix) => file.startsWith(prefix))) continue;
       rule.re.lastIndex = 0;
       let match;

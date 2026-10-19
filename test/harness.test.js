@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createElement, createFakeClock, createFakeJQuery, loadScript } from './harness.mjs';
+import { createElement, createFakeClock, createFakeJQuery, loadScript, loadScripts } from './harness.mjs';
 
 test('the fake clock fires and clears intervals on demand', () => {
   const clock = createFakeClock();
@@ -26,6 +26,35 @@ test('the fake clock fires and clears intervals on demand', () => {
   assert.equal(clock.activeCount, 0);
   clock.tick(2);
   assert.equal(fired, 3, 'a cleared interval never fires again');
+});
+
+test('the fake clock also runs and cancels deferred work', () => {
+  const clock = createFakeClock();
+  const ran = [];
+
+  clock.setTimeout(() => ran.push('kept'), 400);
+  const cancelled = clock.setTimeout(() => ran.push('cancelled'), 400);
+  clock.clearTimeout(cancelled);
+
+  assert.equal(clock.pendingTimeouts, 1);
+  assert.equal(clock.flush(), 1);
+  assert.deepEqual(ran, ['kept']);
+  assert.equal(clock.pendingTimeouts, 0, 'a drained queue is empty');
+
+  // Work queued by the callback itself still runs, and a self-requeueing
+  // callback stops instead of hanging the test.
+  clock.setTimeout(() => {
+    ran.push('outer');
+    clock.setTimeout(() => ran.push('inner'), 0);
+  }, 0);
+  assert.equal(clock.flush(), 2);
+  assert.deepEqual(ran, ['kept', 'outer', 'inner']);
+
+  const forever = createFakeClock();
+  forever.setTimeout(function loop() {
+    forever.setTimeout(loop, 0);
+  }, 0);
+  assert.equal(forever.flush(5), 5, 'flush is bounded');
 });
 
 test('the jQuery double records what a script does to an element', () => {
@@ -73,4 +102,47 @@ test('the sandbox executes the shipped file and exposes its exports', () => {
     bot.respondTo('hello'),
     'Welcome To Precog Security. Choose 1 DOMESTIC 2 LEGAL 3 BUSINESS 4 COMMUNITY',
   );
+});
+
+test('several shipped files can share one sandbox', () => {
+  // js/index.js calls the global chatBot declared by js/chat-bot.js; testing
+  // that wiring needs both files in the same context.
+  const sandbox = loadScripts(['js/chat-bot.js', 'js/index.js'], { jQuery: () => {} });
+
+  assert.equal(typeof sandbox.chatBot, 'function');
+});
+
+test('the double records the DOM writes the chat widget makes', () => {
+  const jQuery = createFakeJQuery();
+
+  // css() takes both an object and a name/value pair.
+  const element = createElement('x');
+  const wrapper = jQuery.set([element]);
+  wrapper.css({ color: '#f00' }).css('display', 'block');
+  assert.deepEqual(element.cssValue, { color: '#f00', display: 'block' });
+
+  // .text() and .val() are distinct sinks: one writes text, the other a value.
+  wrapper.text('hello').val('typed');
+  assert.equal(element.textValue, 'hello');
+  assert.equal(element.value, 'typed');
+
+  // An HTML literal becomes an element, and find() lazily exposes its children.
+  const line = jQuery('<div><span class="text"></span></div>');
+  line.find('.text').addClass('reply').text('hi');
+  assert.equal(line.nodes[0].classes.length, 0, 'classes land on the child, not the line');
+  assert.deepEqual(line.nodes[0].children.text.classes, ['reply']);
+  assert.equal(line.nodes[0].children.text.textValue, 'hi');
+
+  // append() records the node, and event handlers can be invoked afterwards.
+  const chat = createElement('chat');
+  let seen = null;
+  jQuery.set([chat]).on('click', () => (seen = 'clicked')).append(line);
+  chat.handlers.click();
+  assert.equal(seen, 'clicked');
+  assert.equal(chat.appended[0], line.nodes[0]);
+
+  assert.equal(chat.animations.length, 0);
+  jQuery.set([chat]).stop().animate({ scrollTop: 42 });
+  assert.deepEqual(chat.animations, [{ scrollTop: 42 }]);
+  assert.equal(jQuery.set([createElement('y')]).prop('scrollHeight', 7).prop('scrollHeight'), 7);
 });
