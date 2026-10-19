@@ -25,14 +25,19 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      # Actions are pinned to a commit SHA, not to a tag. A tag is mutable -
+      # anyone who can move `v4` changes what this job runs, on every repository
+      # that trusts the tag. The SHA cannot move, and the comment records which
+      # release it is. Bump deliberately with:
+      #   npm view <action>  /  gh api repos/<owner>/<repo>/commits/<tag>
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # Do not leave the job's token in .git/config for later steps.
           persist-credentials: false
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           # Single source of truth for the Node version, shared with .npmrc's
           # engine-strict so a local run and a CI run agree.
@@ -51,11 +56,13 @@ jobs:
       - name: Verify vendored dependency integrity
         run: npm run verify:vendor
 
-      # Includes: unit tests for the countdown, the chat bot and the tracking
-      # link builder; HTML asset integrity; the vendor manifest; and a live
-      # request against the development server, including traversal attempts.
-      - name: Run the test suite
-        run: npm test
+      # Includes: unit tests for the countdown, the chat bot, the chat widget
+      # and the tracking link builder; HTML asset integrity; the vendor
+      # manifest; and live requests against the development server, including
+      # traversal attempts and injected stream failures. Fails if line coverage
+      # drops below the floor in scripts/coverage-gate.mjs.
+      - name: Run the test suite with the coverage floor
+        run: npm run test:coverage
 
       - name: Audit dependencies
         run: npm audit --audit-level=high

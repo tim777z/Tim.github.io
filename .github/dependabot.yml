@@ -1,0 +1,44 @@
+# Dependency updates, opened as pull requests.
+#
+# This repository has one dev dependency (jQuery) and two workflows, so the
+# point of Dependabot here is not volume - it is that nothing rots silently.
+# jQuery is vendored into vendor/ by `npm run vendor:sync`, which re-pins the
+# SHA-256 in vendor/manifest.json, so an upgrade pull request shows up as a
+# change to the manifest as well as to the lockfile. Nothing merges without the
+# full `npm run verify` gate going green on it.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # One pull request for the routine bump, one for anything that carries a
+      # security advisory, so an urgent update is never buried in a roll-up.
+      non-major-dependencies:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "chore(ci)"

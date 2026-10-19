@@ -15,12 +15,16 @@ flows that mislead visitors. Everything below addresses one of those four.
 | --- | --- |
 | Secrets in the repository | One, and it is a public browser API key. See the inventory below. |
 | Third-party code | Pinned in `vendor/manifest.json` with SHA-256, verified on every push. |
+| Third-party install scripts | Refused. `.npmrc` sets `ignore-scripts=true`. |
 | jQuery | 3.7.1 (was 1.7.2 from 2011). |
-| Plaintext transport | None in first-party code. `npm run lint` fails the build if any returns. |
+| Plaintext transport | None in first-party code, HTML or CSS. `npm run lint` fails the build if any returns. |
 | DOM XSS sinks | None. All dynamic text is written with `.text()` / `textContent`. |
 | Redirects | One, and it is https-only with a parameter allowlist and per-parameter validation. |
 | Location data | Requested only after an explicit click, never on page load. |
-| CI | Least-privilege permissions, no credential persistence, six gates. |
+| CI | Least-privilege permissions, no credential persistence, five gates, actions pinned to commit SHAs. |
+| Static analysis | CodeQL on the first-party JavaScript, every push and weekly. |
+| Updates | Dependabot opens weekly pull requests for npm and for the workflows. |
+| Dev server | Bound to 127.0.0.1, refuses traversal, logs every request and failure as JSON. |
 
 ## Public credential inventory
 
@@ -53,7 +57,8 @@ entries in `scripts/secret-scan-allowlist.json` plus this table.
 `npm run verify` — and every CI run — fails on:
 
 1. a syntax error in any first-party script;
-2. a plaintext `http://` subresource, redirect or URL literal in first-party code;
+2. a plaintext `http://` subresource, redirect or URL literal in first-party
+   code, including `url()` and `@import` in a stylesheet;
 3. an `innerHTML`, `insertAdjacentHTML`, `eval`, `new Function` or
    `document.write` in first-party code;
 4. a duplicate element `id` in any page;
@@ -62,7 +67,8 @@ entries in `scripts/secret-scan-allowlist.json` plus this table.
 6. a vendored file whose SHA-256 does not match `vendor/manifest.json`, a
    vendored file with no manifest entry, or a manifest entry with no provenance;
 7. a failing test, including the regression tests for the bugs listed below;
-8. a dependency advisory at high or critical (`npm audit --audit-level=high`).
+8. line coverage below the floor set in `scripts/coverage-gate.mjs`;
+9. a dependency advisory at high or critical (`npm audit --audit-level=high`).
 
 ## Content-Security-Policy
 
@@ -98,6 +104,22 @@ next piece of work on this page.
 
 Recorded because they were live, not because they are interesting:
 
+- **A plaintext third-party image in a stylesheet.** `style2.css` pulled its
+  Facebook social-plugin chrome from a `http://` Rackspace CDN that no longer
+  exists: blocked as mixed content on the https page, and a third party fetching
+  from the visitor's browser on any page that used it. Removed, and the lint gate
+  now reads `url()` and `@import` in stylesheets - the HTML-attribute-only rule
+  set could not see this class of problem at all.
+- **Actions referenced by mutable tag.** `actions/checkout` and
+  `actions/setup-node` were pinned to `@v4`, which anyone able to move the tag
+  can repoint. Both are now pinned to a commit SHA with the release in a comment;
+  CodeQL is pinned the same way.
+- **A development server that failed silently.** A read error called
+  `res.destroy()` and wrote nothing anywhere, so a refused request, a missing
+  file and a broken asset were indistinguishable. Every request, refusal, stream
+  failure and malformed request line is now a structured JSON record, including
+  the errno code, plus counters in the shutdown log.
+- **A `console.log` shipped to visitors** in the Cordova wrapper's starter code.
 - **Personal data forwarded over plaintext HTTP.** `gotourl.js` copied
   `msisdn`, `fname`, `oid`, `poid` and `s1` from the query string into a
   `http://trckingnow.com/click` link with no encoding and no validation. Now:
@@ -136,9 +158,15 @@ Recorded because they were live, not because they are interesting:
 - The Facebook embed requests `public_profile` only. The previous version also
   requested `email` and then called `FB.api('/me')`, which needed an access token
   and pulled the visitor's profile into the page for no benefit.
-- GitHub Actions are referenced by major version tag (`actions/checkout@v4`).
-  Pinning them to a commit SHA is the correct next step and needs a network
-  lookup to do safely; it is not done here rather than done with a guess.
+- GitHub Actions are referenced by commit SHA
+  (`actions/checkout@11d5960`, `actions/setup-node@49933ea`,
+  `github/codeql-action@ce5e7ee`, all as of 2026-10-19), not by a mutable tag.
+  Dependabot opens pull requests for the workflows, so a pinned action can
+  still be upgraded deliberately.
+- The site is published by GitHub Pages directly from the default branch. There
+  is deliberately no deploy job in CI: a Pages *workflow* deploy would take the
+  live site over from the branch publish, and that is a publishing decision, not
+  a refactor. Add it only alongside the Pages settings that back it.
 
 ## Reporting a vulnerability
 
