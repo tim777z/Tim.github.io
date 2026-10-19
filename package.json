@@ -34,7 +34,7 @@
   "homepage": "https://tim777z.github.io/",
   "dependencies": {},
   "devDependencies": {
-    "jquery": "3.7.1"
+    "jquery": "4.0.0"
   },
   "browserslist": [
     "> 0.5%",
