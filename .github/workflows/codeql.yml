@@ -56,7 +56,7 @@ jobs:
           queries: security-and-quality
 
       - name: Analyze
-        uses: github/codeql-action/analyze@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3.39.0
+        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: "/language:${{ matrix.language }}"
           # Raise this to "high" when the alert backlog is empty; until then,
